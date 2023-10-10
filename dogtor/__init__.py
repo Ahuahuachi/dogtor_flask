@@ -1,8 +1,37 @@
-from flask import Flask
+from flask import Flask, request
 
 
 def create_app():
     app = Flask(__name__)
+
+    users = [
+        {"id": 1, "username": "user0", "email": "user0@kodemia.mx"},
+        {"id": 2, "username": "user1", "email": "user1@kodemia.mx"},
+        {"id": 3, "username": "user2", "email": "user2@kodemia.mx"},
+    ]
+
+    @app.route("/users/<int:user_id>", methods=["GET", "PUT", "DELETE"])
+    def get_change_delete_user(user_id):
+        """Single user interaction route"""
+        found_user = None
+        for user in users:
+            if user["id"] == user_id:
+                found_user = user
+
+        if request.method == "PUT":
+            return {"detail": f"user {found_user['username']} modified"}
+        if request.method == "DELETE":
+            return {"detail": f"user {found_user['username']} deleted"}
+
+        return found_user
+
+    @app.route("/users/", methods=["GET", "POST"])
+    def get_or_create_users():
+        """All users interaction route"""
+        if request.method == "POST":
+            data = request.get_json()
+            return {"detail": f"user {data['username']} created"}
+        return users
 
     @app.route("/")
     def hello():
