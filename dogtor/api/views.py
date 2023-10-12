@@ -1,6 +1,7 @@
 from flask import request
+from dogtor.db import db
 
-from . import api
+from . import api, models
 
 users_data = [
     {"id": 1, "username": "user0", "email": "user0@kodemia.mx"},
@@ -46,6 +47,38 @@ def procedures():
     return []
 
 
-@api.route("/species/")
-def species():
-    return []
+@api.route("/species/<int:species_id>", methods=["GET", "PUT", "DELETE"])
+@api.route("/species/", methods=["GET", "POST"])
+def species_endpoint(species_id=None):
+    try:
+        data = request.get_json()
+    except:
+        pass
+
+    if species_id is not None:
+        species = models.Species.query.get_or_404(species_id, "Species not found")
+        if request.method == "GET":
+            return {"id": species.id, "name": species.name}
+
+        if request.method == "PUT":
+            species.name = data["name"]
+            msg = f"species {species.name} modified"
+
+        if request.method == "DELETE":
+            db.session.delete(species)
+            msg = f"species {species.name} deleted"
+
+        db.session.commit()
+        return {"detail": msg}
+
+    if request.method == "GET":
+        species = models.Species.query.all()
+        return [{"id": species.id, "name": species.name} for species in species]
+
+    if request.method == "POST":
+        species = models.Species(name=data["name"])
+
+        db.session.add(species)
+        db.session.commit()
+
+        return {"detail": f"species {species.name} created successfully"}
