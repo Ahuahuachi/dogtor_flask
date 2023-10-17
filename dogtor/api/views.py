@@ -1,5 +1,9 @@
+from datetime import datetime, timedelta
+import jwt
 from flask import request
+from werkzeug.security import generate_password_hash, check_password_hash
 from dogtor.db import db
+from dogtor.config import Config
 
 from . import api, models
 
@@ -82,3 +86,60 @@ def species_endpoint(species_id=None):
         db.session.commit()
 
         return {"detail": f"species {species.name} created successfully"}
+
+
+@api.route("/signup/", methods=["POST"])
+def signup():
+    data = request.get_json()
+    email = data.get("email")
+
+    if not email:
+        return {"detail": "email is required"}, 400
+
+    user_exists = db.session.execute(
+        db.select(models.User).where(models.User.email == email)
+    ).scalar_one_or_none()
+
+    if user_exists:
+        return {"detail": "email already taken"}, 400
+
+    password = data.get("password")
+
+    user = models.User(
+        first_name=data.get("first_name"),
+        last_name=data.get("last_name"),
+        email=email,
+        password=generate_password_hash(password),
+    )
+    db.session.add(user)
+    db.session.commit()
+    return {"detail": "user created successfully"}, 201
+
+
+@api.route("/login/", methods=["POST"])
+def login():
+    """Login an app user"""
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return {"detail": "missing email or password"}, 400
+
+    user = db.session.execute(
+        db.select(models.User).where(models.User.email == email)
+    ).scalar_one_or_none()
+
+    if not user or not check_password_hash(user.password, password):
+        return {"detail": "invalid email or password"}, 401
+
+    token = jwt.encode(
+        {
+            "sub": user.id,
+            "iat": datetime.now(),
+            "exp": datetime.now() + timedelta(minutes=30),
+        },
+        Config.SECRET_KEY,
+    )
+
+    return {"token": token}

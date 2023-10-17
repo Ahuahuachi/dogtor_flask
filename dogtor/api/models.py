@@ -5,8 +5,10 @@ from sqlalchemy.orm import mapped_column
 
 class User(db.Model):
     id = mapped_column(Integer, primary_key=True)
-    username = mapped_column(String, unique=True, nullable=False)
-    email = mapped_column(String, unique=True)
+    first_name = db.Column(String(length=50), nullable=False)
+    last_name = db.Column(String(length=50), nullable=True)
+    email = db.Column(String, unique=True, nullable=False)
+    password = db.Column(String, nullable=False)
 
 
 class Owner(db.Model):
@@ -18,7 +20,7 @@ class Owner(db.Model):
     phone = db.Column(String(length=15))
     mobile = db.Column(String(length=15))
     email = db.Column(String)
-    pets = db.relationship("Pet", backref="owner")
+    pets = db.relationship("Pet", bac_populates="owner")
 
 
 class Species(db.Model):
@@ -26,7 +28,7 @@ class Species(db.Model):
 
     id = db.Column(Integer, primary_key=True)
     name = db.Column(String(length=20))
-    pet = db.relationship("Pet", backref="species")
+    pets = db.relationship("Pet", back_populates="species")
 
 
 class Pet(db.Model):
@@ -38,6 +40,9 @@ class Pet(db.Model):
     age = db.Column(Integer)
     species_id = db.Column(Integer, db.ForeignKey("species.id"))
     record_id = db.Column(Integer, db.ForeignKey("record.id"))
+    species = db.relationship("Species", back_populates="pets")
+    owner = db.relationship("Owner", back_populates="pets")
+    records = db.relationship("Record", back_populates="pets")
 
 
 record_category_m2m = db.Table(
@@ -51,12 +56,11 @@ class Record(db.Model):
     """Pet record object"""
 
     id = db.Column(Integer, primary_key=True)
-    category = db.Column(String(length=20))
     procedure = db.Column(String(length=255))
-    pet = db.relationship("Pet", backref="record")
+    pet = db.relationship("Pet", back_populates="records")
     date = db.Column(DateTime)
     categories = db.relationship(
-        "Category", secondary=record_category_m2m, backref="records"
+        "Category", secondary=record_category_m2m, back_populates="records"
     )
 
 
@@ -66,5 +70,5 @@ class Category(db.Model):
     id = db.Column(Integer, primary_key=True)
     name = db.Column(String(length=20))
     records = db.relationship(
-        "Record", secondary=record_category_m2m, backref="categories"
+        "Record", secondary=record_category_m2m, back_populates="categories"
     )
