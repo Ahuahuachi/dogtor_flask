@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from functools import wraps
 import jwt
 from flask import request
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,6 +13,49 @@ users_data = [
     {"id": 2, "username": "user1", "email": "user1@kodemia.mx"},
     {"id": 3, "username": "user2", "email": "user2@kodemia.mx"},
 ]
+
+
+def token_required(func):
+    @wraps(func)
+    def wrapper():
+        authorization = request.headers.get("Authorization")
+        prefix = "Bearer "
+
+        if not authorization:
+            return {"detail": 'Missing "Authorization" header'}, 401
+
+        if not authorization.startswith(prefix):
+            return {"detail": "Invalid token prefix"}, 401
+
+        token = authorization.split(" ")[1]
+        if not token:
+            return {"detail": "Missing token"}, 401
+
+        try:
+            payload = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
+        except jwt.exceptions.ExpiredSignatureError:
+            return {"detail": "Token expired"}, 401
+        except jwt.exceptions.InvalidTokenError:
+            return {"detail": "Invalid token"}, 401
+
+        request.user = db.session.execute(
+            db.select(models.User).where(models.User.id == payload["sub"])
+        ).scalar_one()
+
+        return func()
+
+    return wrapper
+
+
+@api.route("/profile/", methods=["POST"])
+@token_required
+def profile():
+    user = request.user
+    return {
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+    }
 
 
 @api.route("/users/<int:user_id>", methods=["GET", "PUT", "DELETE"])
@@ -41,7 +85,8 @@ def pets():
     return []
 
 
-@api.route("/owners/")
+@api.route("/owners/", methods=["POST"])
+@token_required
 def owners():
     return []
 
@@ -136,8 +181,7 @@ def login():
     token = jwt.encode(
         {
             "sub": user.id,
-            "iat": datetime.now(),
-            "exp": datetime.now() + timedelta(minutes=30),
+            "exp": datetime.utcnow() + timedelta(minutes=30),
         },
         Config.SECRET_KEY,
     )

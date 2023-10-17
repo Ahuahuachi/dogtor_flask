@@ -20,7 +20,7 @@ class Owner(db.Model):
     phone = db.Column(String(length=15))
     mobile = db.Column(String(length=15))
     email = db.Column(String)
-    pets = db.relationship("Pet", bac_populates="owner")
+    pets = db.relationship("Pet", back_populates="owner")
 
 
 class Species(db.Model):
