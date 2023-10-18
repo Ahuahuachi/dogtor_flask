@@ -42,7 +42,7 @@ def token_required(func):
             db.select(models.User).where(models.User.id == payload["sub"])
         ).scalar_one()
 
-        return func()
+        return func(*args, **kwargs)
 
     return wrapper
 
