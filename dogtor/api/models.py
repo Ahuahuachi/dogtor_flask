@@ -27,8 +27,14 @@ class Species(db.Model):
     """Pet species object"""
 
     id = db.Column(Integer, primary_key=True)
-    name = db.Column(String(length=20))
+    name = db.Column(String(length=20), unique=True)
     pets = db.relationship("Pet", back_populates="species")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+        }
 
 
 class Pet(db.Model):

@@ -1,23 +1,19 @@
 from datetime import datetime, timedelta
 from functools import wraps
+
 import jwt
 from flask import request
-from werkzeug.security import generate_password_hash, check_password_hash
-from dogtor.db import db
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from dogtor.config import Config
+from dogtor.db import db
 
 from . import api, models
-
-users_data = [
-    {"id": 1, "username": "user0", "email": "user0@kodemia.mx"},
-    {"id": 2, "username": "user1", "email": "user1@kodemia.mx"},
-    {"id": 3, "username": "user2", "email": "user2@kodemia.mx"},
-]
 
 
 def token_required(func):
     @wraps(func)
-    def wrapper():
+    def wrapper(*args, **kwargs):
         authorization = request.headers.get("Authorization")
         prefix = "Bearer "
 
@@ -50,6 +46,7 @@ def token_required(func):
 @api.route("/profile/", methods=["POST"])
 @token_required
 def profile():
+    """Returns current user details"""
     user = request.user
     return {
         "first_name": user.first_name,
@@ -96,41 +93,79 @@ def procedures():
     return []
 
 
-@api.route("/species/<int:species_id>", methods=["GET", "PUT", "DELETE"])
-@api.route("/species/", methods=["GET", "POST"])
-def species_endpoint(species_id=None):
-    try:
-        data = request.get_json()
-    except:
-        pass
+@api.get("/species/")
+@token_required
+def get_all_species():
+    """Returns all pet species"""
+    query = db.select(models.Species)
+    result = db.session.execute(query).scalars()
 
-    if species_id is not None:
-        species = models.Species.query.get_or_404(species_id, "Species not found")
-        if request.method == "GET":
-            return {"id": species.id, "name": species.name}
+    return [species.to_dict() for species in result]
 
-        if request.method == "PUT":
-            species.name = data["name"]
-            msg = f"species {species.name} modified"
 
-        if request.method == "DELETE":
-            db.session.delete(species)
-            msg = f"species {species.name} deleted"
+@api.get("/species/<int:species_id>")
+@token_required
+def get_one_species(species_id):
+    """Returns a single species"""
+    query = db.select(models.Species).where(models.Species.id == species_id)
+    species = db.session.execute(query).scalar()
+    if species is None:
+        return {"detail": "Species not found"}, 404
+    return species.to_dict()
 
-        db.session.commit()
-        return {"detail": msg}
 
-    if request.method == "GET":
-        species = models.Species.query.all()
-        return [{"id": species.id, "name": species.name} for species in species]
+@api.post("/species/")
+@token_required
+def create_species():
+    """Create a new pet species"""
+    data = request.get_json()
+    if "name" not in data:
+        return {"detail": 'Field "name" is required'}, 400
 
-    if request.method == "POST":
-        species = models.Species(name=data["name"])
+    query = db.select(models.Species).where(
+        db.func.lower(models.Species.name) == db.func.lower(data["name"])
+    )
+    if db.session.execute(query).scalar():
+        return {"detail": "Species already exists"}, 409
 
-        db.session.add(species)
-        db.session.commit()
+    species = models.Species(name=data["name"])
+    db.session.add(species)
+    db.session.commit()
 
-        return {"detail": f"species {species.name} created successfully"}
+    return species.to_dict(), 201
+
+
+@api.put("/species/<int:species_id>")
+@token_required
+def update_species(species_id):
+    """Update a pet species"""
+    data = request.get_json()
+    if "name" not in data:
+        return {"detail": 'Field "name" is required'}, 400
+
+    species = db.session.execute(
+        db.select(models.Species).where(models.Species.id == species_id)
+    ).scalar()
+    species.name = data["name"]
+    db.session.commit()
+
+    return species.to_dict()
+
+
+@api.delete("/species/<int:species_id>")
+@token_required
+def delete_species(species_id):
+    """Delete a pet species"""
+    species = db.session.execute(
+        db.select(models.Species).where(models.Species.id == species_id)
+    ).scalar()
+    if not species:
+        return {"detail": "Species not found"}, 404
+
+    db.session.delete(species)
+    db.session.commit()
+
+    return {"detail": "Species deleted"}, 200
 
 
 @api.route("/signup/", methods=["POST"])
