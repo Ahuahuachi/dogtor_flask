@@ -1,6 +1,7 @@
-from dogtor.db import db
-from sqlalchemy import Integer, String, DateTime
+from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import mapped_column
+
+from dogtor.db import db
 
 
 class User(db.Model):
@@ -19,8 +20,19 @@ class Owner(db.Model):
     last_name = db.Column(String(length=50))
     phone = db.Column(String(length=15))
     mobile = db.Column(String(length=15))
-    email = db.Column(String)
+    email = db.Column(String, unique=True)
     pets = db.relationship("Pet", back_populates="owner")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "phone": self.phone,
+            "mobile": self.mobile,
+            "email": self.email,
+            # "pets": [pet.to_json() for pet in self.pets],
+        }
 
 
 class Species(db.Model):

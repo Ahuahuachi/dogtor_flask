@@ -82,10 +82,90 @@ def pets():
     return []
 
 
-@api.route("/owners/", methods=["POST"])
+@api.get("/owners/")
 @token_required
-def owners():
-    return []
+def get_owners():
+    """Returns all pet owners"""
+    query = db.select(models.Owner)
+    owners = db.session.execute(query).scalars()
+    return [owner.to_dict() for owner in owners]
+
+
+@api.get("/owners/<int:owner_id>")
+@token_required
+def get_owner(owner_id):
+    """Returns a pet owner by id"""
+    query = db.select(models.Owner).where(owner_id == models.Owner.id)
+    owner = db.session.execute(query).scalar()
+
+    if owner is None:
+        return {"detail": "Owner not found"}, 404
+
+    return owner.to_dict()
+
+
+@api.post("/owners/")
+@token_required
+def create_owner():
+    """Creates a new pet owner"""
+    data = request.get_json()
+    required_fields = ["first_name", "last_name", "phone", "mobile", "email"]
+    for attr in required_fields:
+        if attr not in data:
+            return {"detail": f'"{attr}" field is required'}, 400
+
+    query = db.select(models.Owner).where(
+        db.func.lower(models.Owner.email) == db.func.lower(data["email"])
+    )
+    if db.session.execute(query).scalar() is not None:
+        return {"detail": f"owner with email {data['email']} already exists"}, 409
+
+    owner = models.Owner(
+        first_name=data["first_name"],
+        last_name=data["last_name"],
+        phone=data["phone"],
+        mobile=data["mobile"],
+        email=data["email"],
+    )
+    db.session.add(owner)
+    db.session.commit()
+    return owner.to_dict()
+
+
+@api.put("/owners/<int:owner_id>/")
+@token_required
+def update_owner(owner_id):
+    """Updates an existing pet owner"""
+    data = request.get_json()
+    query = db.select(models.Owner).where(models.Owner.id == owner_id)
+    owner = db.session.execute(query).scalar()
+    if owner is None:
+        return {"detail": f"owner with id {owner_id} does not exist"}, 404
+
+    required_fields = ["first_name", "last_name", "phone", "mobile", "email"]
+    for attr in required_fields:
+        if attr not in data:
+            return {"detail": f'"{attr}" field is required'}, 400
+
+    for key, value in data.items():
+        setattr(owner, key, value)
+
+    db.session.commit()
+    return owner.to_dict()
+
+
+@api.delete("/owners/<int:owner_id>/")
+@token_required
+def delete_owner(owner_id):
+    """Deletes an existing pet owner"""
+    query = db.select(models.Owner).where(models.Owner.id == owner_id)
+    owner = db.session.execute(query).scalar()
+    if owner is None:
+        return {"detail": f"owner with id {owner_id} does not exist"}, 404
+
+    db.session.delete(owner)
+    db.session.commit()
+    return {"detail": f"owner with id {owner_id} deleted successfully"}, 200
 
 
 @api.route("/procedures/")
