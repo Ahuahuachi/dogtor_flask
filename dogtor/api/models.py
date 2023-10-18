@@ -42,7 +42,7 @@ class Pet(db.Model):
     record_id = db.Column(Integer, db.ForeignKey("record.id"))
     species = db.relationship("Species", back_populates="pets")
     owner = db.relationship("Owner", back_populates="pets")
-    records = db.relationship("Record", back_populates="pets")
+    records = db.relationship("Record", back_populates="pet")
 
 
 record_category_m2m = db.Table(
