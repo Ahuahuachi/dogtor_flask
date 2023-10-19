@@ -24,6 +24,7 @@ class Owner(db.Model):
     pets = db.relationship("Pet", back_populates="owner")
 
     def to_dict(self):
+        """Owner dictionary representation"""
         return {
             "id": self.id,
             "first_name": self.first_name,
@@ -31,7 +32,7 @@ class Owner(db.Model):
             "phone": self.phone,
             "mobile": self.mobile,
             "email": self.email,
-            # "pets": [pet.to_json() for pet in self.pets],
+            "pets": [pet.to_dict() for pet in self.pets],
         }
 
 
@@ -43,6 +44,7 @@ class Species(db.Model):
     pets = db.relationship("Pet", back_populates="species")
 
     def to_dict(self):
+        """Species dictionary representation"""
         return {
             "id": self.id,
             "name": self.name,
@@ -57,10 +59,21 @@ class Pet(db.Model):
     owner_id = db.Column(Integer, db.ForeignKey("owner.id"))
     age = db.Column(Integer)
     species_id = db.Column(Integer, db.ForeignKey("species.id"))
-    record_id = db.Column(Integer, db.ForeignKey("record.id"))
+
     species = db.relationship("Species", back_populates="pets")
     owner = db.relationship("Owner", back_populates="pets")
     records = db.relationship("Record", back_populates="pet")
+
+    def to_dict(self):
+        """Pet dictionary representation"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "owner_id": self.owner_id,
+            "age": self.age,
+            "species": self.species.name,
+            # "records": [record.to_dict() for record in self.records],
+        }
 
 
 record_category_m2m = db.Table(
@@ -75,8 +88,9 @@ class Record(db.Model):
 
     id = db.Column(Integer, primary_key=True)
     procedure = db.Column(String(length=255))
-    pet = db.relationship("Pet", back_populates="records")
     date = db.Column(DateTime)
+    pet_id = db.Column(Integer, db.ForeignKey("pet.id"))
+    pet = db.relationship("Pet", back_populates="records")
     categories = db.relationship(
         "Category", secondary=record_category_m2m, back_populates="records"
     )

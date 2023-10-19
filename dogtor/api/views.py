@@ -77,9 +77,94 @@ def users(user_id=None):
     return users_data
 
 
-@api.route("/pets/")
-def pets():
-    return []
+@api.get("/pets/")
+@token_required
+def get_pets():
+    """Returns all pets"""
+    query = db.select(models.Pet)
+    pets = db.session.execute(query).scalars()
+    return [pet.to_dict() for pet in pets]
+
+
+@api.get("/pets/<int:pet_id>")
+@token_required
+def get_pet(pet_id):
+    """Returns a Pet"""
+    query = db.select(models.Pet).where(models.Pet.id == pet_id)
+    pet = db.session.execute(query).scalar()
+
+    if pet is None:
+        return {"detail": "Pet not found"}, 404
+
+    return pet.to_dict()
+
+
+@api.post("/pets/")
+@token_required
+def create_pet():
+    """Creates a new pet"""
+    data = request.get_json()
+    required_fields = ["name", "owner_id", "age", "species_id"]
+    for field in required_fields:
+        if field not in data:
+            return {"detail": f'"{field}" field is required'}, 400
+
+    pet_name = data["name"]
+    owner_id = data["owner_id"]
+    species_id = data["species_id"]
+    query = db.select(models.Pet).where(
+        db.func.lower(models.Pet.name) == db.func.lower(pet_name),
+        models.Pet.owner_id == owner_id,
+        models.Pet.species_id == species_id,
+    )
+    if db.session.execute(query).scalar() is not None:
+        return {"detail": f'Pet "{pet_name}" already exists'}, 409
+
+    pet = models.Pet(
+        name=pet_name,
+        owner_id=owner_id,
+        age=data["age"],
+        species_id=species_id,
+    )
+    db.session.add(pet)
+    db.session.commit()
+    return pet.to_dict(), 201
+
+
+@api.put("/pets/<int:pet_id>")
+@token_required
+def update_pet(pet_id):
+    """Updates an existing pet"""
+    data = request.get_json()
+    query = db.select(models.Pet).where(models.Pet.id == pet_id)
+    pet = db.session.execute(query).scalar()
+    if pet is None:
+        return {"detail": f"Pet with id {pet_id} not found"}, 404
+
+    required_fields = ["name", "owner_id", "age", "species_id"]
+    for field in required_fields:
+        if field not in data:
+            return {"detail": f'"{field}" field is required'}, 400
+
+    for key, value in data.items():
+        setattr(pet, key, value)
+
+    db.session.commit()
+    return pet.to_dict()
+
+
+@api.delete("/pets/<int:pet_id>")
+@token_required
+def delete_pet(pet_id):
+    """Deletes an existing pet"""
+    query = db.select(models.Pet).where(models.Pet.id == pet_id)
+    pet = db.session.execute(query).scalar()
+    if pet is None:
+        return {"detail": f"pet with id {pet_id} not found"}, 404
+
+    db.session.delete(pet)
+    db.session.commit()
+    return {"detail": f"pet with id {pet_id} deleted"}, 200
 
 
 @api.get("/owners/")
@@ -129,7 +214,7 @@ def create_owner():
     )
     db.session.add(owner)
     db.session.commit()
-    return owner.to_dict()
+    return owner.to_dict(), 201
 
 
 @api.put("/owners/<int:owner_id>/")
